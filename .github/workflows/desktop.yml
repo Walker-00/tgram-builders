@@ -130,10 +130,13 @@ jobs:
           SDK="$(grep "SDK version" $TBUILD/teamgram-tdesktop/docs/building-win.md | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
           echo "SDK=$SDK" >> $GITHUB_ENV
           sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/${_Zi}//' "$PROGRAMFILES"/CMake/share/cmake*/Modules/Platform/Windows-MSVC.cmake
+          git config --global user.email "you@example.com"
+          git config --global user.name "Sample"
 
       - uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: x64
+          sdk: ${{ env.SDK }}
 
       - name: Find VS install path.
         shell: bash
@@ -169,6 +172,7 @@ jobs:
           cd %TBUILD%\teamgram-tdesktop\Telegram
 
           call configure.bat ^
+          x64 ^
           -D TDESKTOP_API_TEST=ON ^
           -D CMAKE_CONFIGURATION_TYPES=Debug ^
           -D CMAKE_COMPILE_WARNING_AS_ERROR=ON ^
