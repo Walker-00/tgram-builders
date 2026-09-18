@@ -95,7 +95,7 @@ jobs:
           -D TDESKTOP_API_TEST=ON \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
-          -D TDESKTOP_REALITY_ADDRESS="REPLACE_ME_SERVER_IP" \
+          -D TDESKTOP_REALITY_ADDRESS="${{ secrets.XIP }}" \
           -D TDESKTOP_REALITY_PORT=443 \
           -D TDESKTOP_REALITY_SERVER_NAME=hoyoverse.com \
           -D TDESKTOP_REALITY_UUID="${{ secrets.XID }}" \
