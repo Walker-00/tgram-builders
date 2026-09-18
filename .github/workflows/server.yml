@@ -3,6 +3,8 @@ name: Build teamgram-server
 on:
   push:
   workflow_dispatch: {}
+  repository_dispatch:
+    types: [build-server]
 
 permissions:
   contents: read
