@@ -8,18 +8,9 @@ on:
 
 jobs:
   linux:
-    name: Rocky Linux 8
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        defines:
-          - ""
-          - "DESKTOP_APP_DISABLE_X11_INTEGRATION"
-
     env:
       IMAGE_TAG: tdesktop:centos_env
-
     steps:
       - name: Clone teamgram-tdesktop
         env:
@@ -44,22 +35,19 @@ jobs:
           echo "$DOCKERFILE" > Dockerfile
           rm -rf __pycache__
 
-      - name: Free up some disk space.
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
         with:
           tool-cache: true
 
       - uses: docker/setup-buildx-action@v4
 
-      - name: Libraries cache.
-        uses: actions/cache@v5
+      - uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/.buildx-cache
           key: ${{ runner.OS }}-libs-${{ hashFiles('src/Telegram/build/docker/centos_env/**') }}
           restore-keys: ${{ runner.OS }}-libs-
 
-      - name: Libraries.
-        uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@v7
         with:
           context: src/Telegram/build/docker/centos_env
           load: true
@@ -74,14 +62,6 @@ jobs:
       - name: Telegram Desktop build.
         working-directory: src
         run: |
-          DEFINE=""
-          if [ -n "${{ matrix.defines }}" ]; then
-            DEFINE="-D ${{ matrix.defines }}=ON"
-            echo "ARTIFACT_NAME=Telegram ${{ matrix.defines }}" >> $GITHUB_ENV
-          else
-            echo "ARTIFACT_NAME=Telegram" >> $GITHUB_ENV
-          fi
-
           docker run --rm \
           -u $(id -u) \
           -v $PWD:/usr/src/tdesktop \
@@ -100,19 +80,11 @@ jobs:
           -D TDESKTOP_REALITY_SERVER_NAME=hoyoverse.com \
           -D TDESKTOP_REALITY_UUID="${{ secrets.XID }}" \
           -D TDESKTOP_REALITY_PASSWORD="${{ secrets.XPASS }}" \
-          -D TDESKTOP_REALITY_SHORT_ID="${{ secrets.XSID }}" \
-          $DEFINE
+          -D TDESKTOP_REALITY_SHORT_ID="${{ secrets.XSID }}"
 
       - name: Check.
         working-directory: src
-        run: |
-          filePath="out/Debug/Telegram"
-          if test -f "$filePath"; then
-            echo "Build successfully done!"
-          else
-            echo "Build error, output file does not exist."
-            exit 1
-          fi
+        run: test -f out/Debug/Telegram
 
       - name: Move artifact.
         working-directory: src
@@ -123,5 +95,96 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: teamgram-tdesktop-linux
           path: src/out/Debug/artifact/
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Prepare directories.
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries>>%GITHUB_ENV%
+
+      - name: Clone teamgram-tdesktop
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TD_DP_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/td_dp_key
+          chmod 600 ~/.ssh/td_dp_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/td_dp_key -o IdentitiesOnly=yes" \
+            git clone --depth 1 --recurse-submodules --shallow-submodules \
+            git@github.com:Walker-00/teamgram-tdesktop.git "$TBUILD/teamgram-tdesktop"
+
+      - name: First set up.
+        shell: bash
+        run: |
+          SDK="$(grep "SDK version" $TBUILD/teamgram-tdesktop/docs/building-win.md | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
+          echo "SDK=$SDK" >> $GITHUB_ENV
+          sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/${_Zi}//' "$PROGRAMFILES"/CMake/share/cmake*/Modules/Platform/Windows-MSVC.cmake
+
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      - name: NuGet sources.
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: ThirdParty cache.
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: ${{ runner.OS }}-third-party-${{ hashFiles('**/prepare.py') }}
+
+      - name: Libraries cache.
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.LibrariesPath }}\*
+          key: ${{ runner.OS }}-libs-${{ hashFiles('**/prepare.py') }}
+
+      - name: Libraries.
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
+          GYP_MSVS_VERSION: 2022
+        run: '%TBUILD%\teamgram-tdesktop\Telegram\build\prepare\win.bat skip-release silent'
+
+      - name: Telegram Desktop build.
+        run: |
+          cd %TBUILD%\teamgram-tdesktop\Telegram
+
+          call configure.bat ^
+          -D TDESKTOP_API_TEST=ON ^
+          -D CMAKE_CONFIGURATION_TYPES=Debug ^
+          -D CMAKE_COMPILE_WARNING_AS_ERROR=ON ^
+          -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF ^
+          -D TDESKTOP_REALITY_ADDRESS="${{ secrets.XIP }}" ^
+          -D TDESKTOP_REALITY_PORT=443 ^
+          -D TDESKTOP_REALITY_SERVER_NAME=hoyoverse.com ^
+          -D TDESKTOP_REALITY_UUID="${{ secrets.XID }}" ^
+          -D TDESKTOP_REALITY_PASSWORD="${{ secrets.XPASS }}" ^
+          -D TDESKTOP_REALITY_SHORT_ID="${{ secrets.XSID }}"
+
+          cmake --build ..\out --config Debug --parallel
+
+      - name: Move artifact.
+        run: |
+          mkdir artifact
+          move %TBUILD%\teamgram-tdesktop\out\Debug\Telegram.exe artifact\
+          move %TBUILD%\teamgram-tdesktop\out\Debug\Updater.exe artifact\
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: teamgram-tdesktop-windows
+          path: artifact\
