@@ -150,16 +150,25 @@ jobs:
           nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
 
       - name: ThirdParty cache.
+        id: cache-third-party
         uses: actions/cache@v5
         with:
           path: ${{ env.TBUILD }}\ThirdParty
           key: ${{ runner.OS }}-third-party-${{ hashFiles('**/prepare.py') }}
 
       - name: Libraries cache.
+        id: cache-libs
         uses: actions/cache@v5
         with:
           path: ${{ env.LibrariesPath }}\*
           key: ${{ runner.OS }}-libs-${{ hashFiles('**/prepare.py') }}
+
+      - name: Cache status.
+        shell: bash
+        run: |
+          echo "third-party cache-hit: '${{ steps.cache-third-party.outputs.cache-hit }}'"
+          echo "libs cache-hit: '${{ steps.cache-libs.outputs.cache-hit }}'"
+          echo "hashFiles(prepare.py): '${{ hashFiles('**/prepare.py') }}'"
 
       - name: Libraries.
         env:
@@ -167,12 +176,20 @@ jobs:
           GYP_MSVS_VERSION: 2022
         run: '%TBUILD%\teamgram-tdesktop\Telegram\build\prepare\win.bat skip-release silent'
 
+      - name: Shrink libraries before caching.
+        shell: bash
+        run: |
+          LIBS="$(cygpath -u "$LibrariesPath")"
+          du -sh "$LIBS" || true
+          find "$LIBS" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete || true
+          du -sh "$LIBS" || true
+
       - name: Telegram Desktop build.
         run: |
           cd %TBUILD%\teamgram-tdesktop\Telegram
 
           call configure.bat ^
-          x64 ^
+          -G "Ninja Multi-Config" ^
           -D TDESKTOP_API_TEST=ON ^
           -D CMAKE_CONFIGURATION_TYPES=Debug ^
           -D CMAKE_COMPILE_WARNING_AS_ERROR=ON ^
