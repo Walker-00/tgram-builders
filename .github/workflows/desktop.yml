@@ -184,6 +184,12 @@ jobs:
           find "$LIBS" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete || true
           du -sh "$LIBS" || true
 
+      - name: Fetch Xray sidecar.
+        shell: pwsh
+        run: |
+          & "$env:TBUILD\teamgram-tdesktop\Telegram\build\xray\fetch_xray.ps1" -Arch x86_64
+          Get-ChildItem "$env:TBUILD\teamgram-tdesktop\Telegram\build\xray\windows-x86_64"
+
       - name: Telegram Desktop build.
         run: |
           cd %TBUILD%\teamgram-tdesktop\Telegram
@@ -210,6 +216,8 @@ jobs:
           mkdir artifact
           move %TBUILD%\teamgram-tdesktop\out\Debug\Telegram.exe artifact\
           move %TBUILD%\teamgram-tdesktop\out\Debug\Updater.exe artifact\
+          if exist %TBUILD%\teamgram-tdesktop\out\Debug\xray.exe move %TBUILD%\teamgram-tdesktop\out\Debug\xray.exe artifact\
+          if exist %TBUILD%\teamgram-tdesktop\out\Debug\XRAY-LICENSE move %TBUILD%\teamgram-tdesktop\out\Debug\XRAY-LICENSE artifact\
 
       - uses: actions/upload-artifact@v7
         with:
