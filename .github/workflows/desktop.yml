@@ -135,6 +135,12 @@ jobs:
         with:
           arch: x64
 
+      - name: Find VS install path.
+        shell: bash
+        run: |
+          VSPATH=$("/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath)
+          echo "VSINSTALLPATH=$VSPATH\\" >> $GITHUB_ENV
+
       - name: NuGet sources.
         run: |
           nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
@@ -154,7 +160,7 @@ jobs:
 
       - name: Libraries.
         env:
-          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
+          GYP_MSVS_OVERRIDE_PATH: ${{ env.VSINSTALLPATH }}
           GYP_MSVS_VERSION: 2022
         run: '%TBUILD%\teamgram-tdesktop\Telegram\build\prepare\win.bat skip-release silent'
 
