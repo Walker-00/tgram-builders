@@ -84,14 +84,14 @@ jobs:
 
       - name: Check.
         working-directory: src
-        run: test -f out/Debug/Telegram
+        run: test -f out/Debug/Teamgram
 
       - name: Move artifact.
         working-directory: src
         run: |
           cd out/Debug
           mkdir artifact
-          mv {Telegram,Updater} artifact/
+          mv Teamgram Updater artifact/
 
       - uses: actions/upload-artifact@v7
         with:
@@ -151,14 +151,14 @@ jobs:
 
       - name: ThirdParty cache.
         id: cache-third-party
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ${{ env.TBUILD }}\ThirdParty
           key: ${{ runner.OS }}-third-party-${{ hashFiles('**/prepare.py') }}
 
       - name: Libraries cache.
         id: cache-libs
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ${{ env.LibrariesPath }}\*
           key: ${{ runner.OS }}-libs-${{ hashFiles('**/prepare.py') }}
@@ -183,6 +183,20 @@ jobs:
           du -sh "$LIBS" || true
           find "$LIBS" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete || true
           du -sh "$LIBS" || true
+
+      - name: Save ThirdParty cache.
+        if: always() && steps.cache-third-party.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: ${{ runner.OS }}-third-party-${{ hashFiles('**/prepare.py') }}
+
+      - name: Save Libraries cache.
+        if: always() && steps.cache-libs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.LibrariesPath }}\*
+          key: ${{ runner.OS }}-libs-${{ hashFiles('**/prepare.py') }}
 
       - name: Fetch Xray sidecar.
         shell: pwsh
@@ -214,8 +228,8 @@ jobs:
       - name: Move artifact.
         run: |
           mkdir artifact
-          move %TBUILD%\teamgram-tdesktop\out\Debug\Telegram.exe artifact\
-          move %TBUILD%\teamgram-tdesktop\out\Debug\Updater.exe artifact\
+          move %TBUILD%\teamgram-tdesktop\out\Debug\Teamgram.exe artifact\ || exit /b 1
+          move %TBUILD%\teamgram-tdesktop\out\Debug\Updater.exe artifact\ || exit /b 1
           if exist %TBUILD%\teamgram-tdesktop\out\Debug\xray.exe move %TBUILD%\teamgram-tdesktop\out\Debug\xray.exe artifact\
           if exist %TBUILD%\teamgram-tdesktop\out\Debug\XRAY-LICENSE move %TBUILD%\teamgram-tdesktop\out\Debug\XRAY-LICENSE artifact\
 
